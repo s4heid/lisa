@@ -13,7 +13,7 @@ from lisa.operating_system import Debian, Fedora, Suse
 from lisa.schema import Node
 from lisa.tools import Aria, Dmesg, HyperV, Lscpu, Qemu, RemoteCopy, Wget
 from lisa.tools.rm import Rm
-from lisa.util import LisaException, SkippedException, fields_to_dict, get_matched_str
+from lisa.util import LisaException, SkippedException, constants, fields_to_dict, get_matched_str
 from lisa.util.logger import Logger
 from lisa.util.shell import try_connect
 
@@ -74,7 +74,7 @@ def _create_cloud_init_iso(
                 "name": user_name,
                 "shell": "/bin/bash",
                 "sudo": ["ALL=(ALL) NOPASSWD:ALL"],
-                "groups": ["sudo", "docker"],
+                "groups": constants.DEFAULT_ADMIN_GROUPS,
                 "passwd": cmd_result.stdout,
                 "lock_passwd": False,
             },

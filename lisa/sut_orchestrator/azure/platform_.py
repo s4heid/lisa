@@ -1194,6 +1194,7 @@ class AzurePlatform(Platform):
                 self.runbook.admin_private_key_file
             )
         arm_parameters.admin_password = self.runbook.admin_password
+        arm_parameters.admin_groups = ", ".join(self.runbook.admin_groups)
 
         environment_context = get_environment_context(environment=environment)
         arm_parameters.vm_tags["RG"] = environment_context.resource_group_name

@@ -878,7 +878,7 @@ class BaseLibvirtPlatform(Platform, IBaseLibvirtPlatform):
                     "name": self.runbook.admin_username,
                     "shell": "/bin/bash",
                     "sudo": ["ALL=(ALL) NOPASSWD:ALL"],
-                    "groups": ["sudo", "docker"],
+                    "groups": self.runbook.admin_groups,
                     "ssh_authorized_keys": [environment_context.ssh_public_key],
                 },
             ],

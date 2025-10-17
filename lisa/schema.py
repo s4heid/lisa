@@ -1553,6 +1553,9 @@ class Platform(TypedSchema, ExtendableSchemaMixin):
     admin_username: str = constants.DEFAULT_USER_NAME
     admin_password: str = ""
     admin_private_key_file: str = ""
+    admin_groups: List[str] = field(
+        default_factory=lambda: constants.DEFAULT_ADMIN_GROUPS.copy()
+    )
 
     guest_enabled: bool = False
     guests: List[Node] = field(default_factory=list)

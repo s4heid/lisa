@@ -5,8 +5,8 @@
   "metadata": {
     "_generator": {
       "name": "bicep",
-      "version": "0.37.4.10188",
-      "templateHash": "16291477761159155605"
+      "version": "0.38.33.27573",
+      "templateHash": "9701736846377749075"
     }
   },
   "functions": [
@@ -266,6 +266,26 @@
             "value": "[if(empty(parameters('node').security_profile.disk_encryption_set_id), createObject('securityEncryptionType', parameters('node').security_profile.encryption_type), createObject('securityEncryptionType', parameters('node').security_profile.encryption_type, 'diskEncryptionSet', createObject('id', parameters('node').security_profile.disk_encryption_set_id)))]"
           }
         },
+        "getCloudInitConfig": {
+          "parameters": [
+            {
+              "type": "string",
+              "name": "admin_key_data"
+            },
+            {
+              "type": "string",
+              "name": "admin_username"
+            },
+            {
+              "type": "string",
+              "name": "admin_groups"
+            }
+          ],
+          "output": {
+            "type": "string",
+            "value": "[format('#cloud-config\nusers:\n  - default\n  - name: {0}\n    sudo: ALL=(ALL) NOPASSWD:ALL\n    groups: [{1}]\n    shell: /bin/bash\n    ssh_authorized_keys:\n      - {2}\n', parameters('admin_username'), parameters('admin_groups'), parameters('admin_key_data'))]"
+          }
+        },
         "generateOsProfile": {
           "parameters": [
             {
@@ -283,6 +303,10 @@
             {
               "type": "string",
               "name": "admin_key_data"
+            },
+            {
+              "type": "string",
+              "name": "admin_groups"
             }
           ],
           "output": {
@@ -291,7 +315,8 @@
               "computername": "[parameters('node').short_name]",
               "adminUsername": "[parameters('admin_username')]",
               "adminPassword": "[if(empty(parameters('admin_password')), null(), parameters('admin_password'))]",
-              "linuxConfiguration": "[if(and(not(empty(parameters('admin_key_data'))), parameters('node').is_linux), __bicep.getLinuxConfiguration(format('/home/{0}/.ssh/authorized_keys', parameters('admin_username')), parameters('admin_key_data'), empty(parameters('admin_password'))), null())]"
+              "linuxConfiguration": "[if(and(not(empty(parameters('admin_key_data'))), parameters('node').is_linux), __bicep.getLinuxConfiguration(format('/home/{0}/.ssh/authorized_keys', parameters('admin_username')), parameters('admin_key_data'), empty(parameters('admin_password'))), null())]",
+              "customData": "[if(and(not(empty(parameters('admin_key_data'))), parameters('node').is_linux), base64(__bicep.getCloudInitConfig(parameters('admin_key_data'), parameters('admin_username'), parameters('admin_groups'))), null())]"
             }
           }
         },
@@ -330,12 +355,16 @@
             {
               "type": "string",
               "name": "admin_key_data"
+            },
+            {
+              "type": "string",
+              "name": "admin_groups"
             }
           ],
           "output": {
             "type": "object",
             "nullable": true,
-            "value": "[if(__bicep.isCvmVhd(parameters('node')), null(), __bicep.generateOsProfile(parameters('node'), parameters('admin_username'), parameters('admin_password'), parameters('admin_key_data')))]"
+            "value": "[if(__bicep.isCvmVhd(parameters('node')), null(), __bicep.generateOsProfile(parameters('node'), parameters('admin_username'), parameters('admin_password'), parameters('admin_key_data'), parameters('admin_groups')))]"
           }
         },
         "getImageReference": {
@@ -449,6 +478,12 @@
       "type": "string",
       "metadata": {
         "description": "public key data"
+      }
+    },
+    "admin_groups": {
+      "type": "string",
+      "metadata": {
+        "description": "admin user groups"
       }
     },
     "shared_resource_group_name": {
@@ -800,7 +835,7 @@
         "hardwareProfile": {
           "vmSize": "[parameters('nodes')[range(0, variables('node_count'))[copyIndex()]].vm_size]"
         },
-        "osProfile": "[__bicep.getOsProfile(parameters('nodes')[range(0, variables('node_count'))[copyIndex()]], parameters('admin_username'), parameters('admin_password'), parameters('admin_key_data'))]",
+        "osProfile": "[__bicep.getOsProfile(parameters('nodes')[range(0, variables('node_count'))[copyIndex()]], parameters('admin_username'), parameters('admin_password'), parameters('admin_key_data'), parameters('admin_groups'))]",
         "storageProfile": {
           "copy": [
             {
@@ -852,7 +887,7 @@
         "count": "[length(range(0, variables('node_count')))]"
       },
       "type": "Microsoft.Resources/deployments",
-      "apiVersion": "2022-09-01",
+      "apiVersion": "2025-04-01",
       "name": "[format('{0}-nics', parameters('nodes')[range(0, variables('node_count'))[copyIndex()]].name)]",
       "properties": {
         "expressionEvaluationOptions": {
@@ -898,8 +933,8 @@
           "metadata": {
             "_generator": {
               "name": "bicep",
-              "version": "0.37.4.10188",
-              "templateHash": "17932923534203698710"
+              "version": "0.38.33.27573",
+              "templateHash": "13295280200297736858"
             }
           },
           "functions": [

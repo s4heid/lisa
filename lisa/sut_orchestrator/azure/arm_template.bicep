@@ -16,6 +16,9 @@ param admin_password string
 @description('public key data')
 param admin_key_data string
 
+@description('admin user groups')
+param admin_groups string
+
 @description('the name of shared resource group')
 param shared_resource_group_name string
 
@@ -174,11 +177,24 @@ func getSecurityProfileForOSDisk(node object) object => empty(node.security_prof
   }
 }
 
-func generateOsProfile(node object, admin_username string, admin_password string, admin_key_data string) object => {
+func getCloudInitConfig(admin_key_data string, admin_username string, admin_groups string) string =>
+  format(
+    '#cloud-config\nusers:\n  - default\n  - name: {0}\n    sudo: ALL=(ALL) NOPASSWD:ALL\n    groups: [{1}]\n    shell: /bin/bash\n    ssh_authorized_keys:\n      - {2}\n',
+    admin_username,
+    admin_groups,
+    admin_key_data
+  )
+
+func generateOsProfile(node object, admin_username string, admin_password string, admin_key_data string, admin_groups string) object => {
   computername: node.short_name
   adminUsername: admin_username
   adminPassword: (empty(admin_password) ? null : admin_password)
-  linuxConfiguration: (((!empty(admin_key_data)) && node.is_linux) ? getLinuxConfiguration('/home/${admin_username}/.ssh/authorized_keys', admin_key_data, empty(admin_password)) : null)
+  linuxConfiguration: (((!empty(admin_key_data)) && node.is_linux)
+    ? getLinuxConfiguration('/home/${admin_username}/.ssh/authorized_keys', admin_key_data, empty(admin_password))
+    : null)
+  customData: ((!empty(admin_key_data)) && node.is_linux)
+    ? base64(getCloudInitConfig(admin_key_data, admin_username, admin_groups))
+    : null
 }
 
 func generateSecurityProfile(node object) object => {
@@ -189,9 +205,9 @@ func generateSecurityProfile(node object) object => {
   securityType: node.security_profile.security_type
 }
 
-func getOsProfile(node object, admin_username string, admin_password string, admin_key_data string) object? => isCvmVhd(node) 
+func getOsProfile(node object, admin_username string, admin_password string, admin_key_data string, admin_groups string) object? => isCvmVhd(node) 
 ? null
-: generateOsProfile(node, admin_username, admin_password, admin_key_data)
+: generateOsProfile(node, admin_username, admin_password, admin_key_data, admin_groups)
 
 func getImageReference(node object) object? => isCvmVhd(node) 
 ? null
@@ -438,7 +454,7 @@ resource nodes_vms 'Microsoft.Compute/virtualMachines@2024-03-01' = [for i in ra
     hardwareProfile: {
       vmSize: nodes[i].vm_size
     }
-    osProfile: getOsProfile(nodes[i], admin_username, admin_password, admin_key_data)
+    osProfile: getOsProfile(nodes[i], admin_username, admin_password, admin_key_data, admin_groups)
     storageProfile: {
       imageReference: getImageReference(nodes[i])
       osDisk:  getVMOsDisk(nodes[i])

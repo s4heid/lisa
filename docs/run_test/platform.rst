@@ -219,6 +219,20 @@ deployment.
 
    Do not use a passphrase to protect your key, as LISA does not support it.
 
+* **admin_groups**: This step is optional. Specifies the user groups that the admin user should belong to.
+  If not provided, defaults to ``["sudo", "docker"]``. This is useful for custom images that require
+  the admin user to belong to specific groups. Groups are specified as a list in YAML format.
+
+  Example:
+
+  .. code:: yaml
+
+     platform:
+       - type: azure
+         admin_groups: ["sudo", "docker", "admin", "customgroup"]
+         azure:
+           subscription_id: $(subscription_id)
+
 * **virtual_network_resource_group**. Specify if an existing virtual network
   should be used. If `virtual_network_resource_group` is not provided, a virtual
   network will be created in the default resource group. If

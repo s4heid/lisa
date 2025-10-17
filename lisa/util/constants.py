@@ -40,6 +40,7 @@ NORMALIZE_PATTERN = re.compile(r"[^A-Za-z0-9]")
 
 # default values
 DEFAULT_USER_NAME = "lisatest"
+DEFAULT_ADMIN_GROUPS = ["sudo", "docker"]
 
 # feature names
 FEATURE_DISK = "Disk"
