@@ -1,0 +1,457 @@
+name: azure_stemcell
+test_project: BOSH Azure Stemcell Validation
+
+import_builtin_tests: true
+
+variable:
+  - name: subscription_id
+    value: ""
+  - name: location
+    value: "westus3"
+  - name: keep_environment
+    value: "no"
+  - name: resource_group_name
+    value: ""
+  - name: marketplace_image
+    value: ""
+  - name: shared_gallery
+    value: ""
+  - name: community_gallery_image
+    value: ""
+  - name: vhd
+    value: ""
+  - name: vm_size
+    value: ""
+  - name: deploy
+    value: true
+  - name: wait_delete
+    value: false
+  - name: concurrency
+    value: 5
+  - name: admin_private_key_file
+    value: ""
+    is_secret: true
+  - name: admin_password
+    value: ""
+    is_secret: true
+  - name: azure_arm_access_token
+    value: ""
+    is_secret: true
+  - name: azcopy_path
+    value: ""
+  - name: auth_type
+    value: "default"
+  - name: use_ipv6
+    value: false
+  - name: source_address_prefixes
+    value: ""
+  - name: virtual_network_resource_group
+    value: ""
+  - name: virtual_network_name
+    value: ""
+  - name: subnet_prefix
+    value: ""
+  - name: use_public_address
+    value: true
+  - name: create_public_address
+    value: true
+  - name: test_priorities
+    value:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+  - name: include_gen1_tests
+    value: true
+  - name: include_gen2_tests
+    value: false
+  # Secrets for Notifier
+  - name: azure_openai_endpoint
+    value: ""
+    is_secret: true
+    mask: guid
+  - name: embedding_endpoint
+    value: ""
+    is_secret: true
+    mask: guid
+  - name: azure_openai_api_key
+    value: ""
+    is_secret: true
+    mask: guid
+
+concurrency: $(concurrency)
+
+# When set to True, LISA will terminate test execution immediately after the first test case failure.
+exit_on_first_failure: false
+
+notifier:
+  - type: html
+    auto_open: true
+  - type: env_stats
+  - type: log_agent
+    azure_openai_endpoint: $(azure_openai_endpoint)
+    azure_openai_api_key: $(azure_openai_api_key)
+    embedding_endpoint: $(embedding_endpoint)
+    general_deployment_name: gpt-4.1
+    software_deployment_name: DeepSeek-R1-0528 # gpt-4.1, gpt-4o
+    selected_flow: default
+    skip_duplicate_errors: true
+
+platform:
+  - type: azure
+    admin_private_key_file: $(admin_private_key_file)
+    admin_username: vcap
+    admin_password: $(admin_password)
+    keep_environment: $(keep_environment)
+    azure:
+      credential:
+        type: $(auth_type)
+        token: $(azure_arm_access_token)
+      resource_group_name: $(resource_group_name)
+      deploy: $(deploy)
+      subscription_id: $(subscription_id)
+      wait_delete: $(wait_delete)
+      azcopy_path: $(azcopy_path)
+      use_ipv6: $(use_ipv6)
+      source_address_prefixes: $(source_address_prefixes)
+      virtual_network_resource_group: $(virtual_network_resource_group)
+      virtual_network_name: $(virtual_network_name)
+      subnet_prefix: $(subnet_prefix)
+      use_public_address: $(use_public_address)
+      create_public_address: $(create_public_address)
+    requirement:
+      disk:
+        # Some test cases (foremost xdp) require additional disk space
+        os_disk_size:
+          min: 10 # 10 GB
+      core_count:
+        min: 2
+      azure:
+        marketplace: $(marketplace_image)
+        shared_gallery: $(shared_gallery)
+        community_gallery_image: $(community_gallery_image)
+        vhd: $(vhd)
+        location: $(location)
+        vm_size: $(vm_size)
+    ignored_capability:
+      # GPU related test cases should be excluded as they are not
+      # relevant for any BOSH based deployments.
+      - Gpu
+      - Infiniband
+      - NestedVirtualization
+      # - Security_Profile
+
+# ================================
+# Test Case Schema
+# ================================
+# - criteria:
+#     priority: [1, 2, 3, 4, 5]
+#     name: $(test_case_name)
+#     area: $(test_case_area)
+#     category: $(test_case_category) # functional, stress, community, performance
+#   ignore_failure: true|false
+#   select_action: include|exclude
+#   use_new_environment: true|false
+#   retry: 0
+#   times: 1
+testcase:
+  - criteria:
+      area: azure_image_standard
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  # [ERROR]
+  # Exclude password test case, as root password is not set in BOSH deployed VMs
+  # Exclude resource disk related test cases, as mounts are controlled by BOSH agent
+  - criteria:
+      name: verify_no_pre_exist_users
+    select_action: exclude
+  - criteria:
+      name: verify_resource_disk_file_system
+    select_action: exclude
+  - criteria:
+      name: verify_resource_disk_readme_file
+    select_action: exclude
+  # [SKIPPED]
+  # Exclude tests that are not applicable to Ubuntu
+  # Note: verify_cloud_init_enabled is skipped on Jammy
+  - criteria:
+      name: verify_yum_conf
+    select_action: exclude
+  - criteria:
+      name: verify_dhcp_file_configuration
+    select_action: exclude
+  - criteria:
+      name: verify_udev_rules_moved
+    select_action: exclude
+  - criteria:
+      name: verify_ifcfg_eth0
+    select_action: exclude
+  - criteria:
+      name: verify_network_file_configuration
+    select_action: exclude
+  - criteria:
+      name: verify_network_manager_not_installed
+    select_action: exclude
+
+  # ===== NETWORK =====
+  - criteria:
+      area: network
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  # [SKIPPED]
+  # Exclude tests that are not applicable to Ubuntu
+  - criteria:
+      name: verify_net_iptables
+    select_action: exclude
+  - criteria:
+      name: verify_net_ipset
+    select_action: exclude
+  - criteria:
+      name: verify_net_conntrack
+    select_action: exclude
+
+  # ===== CORE =====
+  - criteria:
+      area: core
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  # [SKIPPED]
+  # Exclude tests that are not applicable to Ubuntu
+  - criteria:
+      name: verify_lis_modules_version
+    select_action: exclude
+  - criteria:
+      name: verify_boot_with_debug_kernel
+    select_action: exclude
+
+  # ===== TIME =====
+  - criteria:
+      area: time
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  # [SKIPPED]
+  # Exclude arm64 related test case as not applicable
+  - criteria:
+      name: verify_pmu_disabled_for_arm64
+    select_action: exclude
+
+  # ===== KVP =====
+  - criteria:
+      area: kvp
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== SECURITY =====
+  - criteria:
+      area: security
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  # [SKIPPED]
+  # Exclude FIPS related test case as not applicable
+  - criteria:
+      name: verify_fips_enablement
+    select_action: exclude
+  - criteria:
+      name: verify_azl_fips_status
+    select_action: exclude
+  - criteria:
+      name: verify_golang_sys_crypto
+    select_action: exclude
+
+  # ===== SRIOV =====
+  - criteria:
+      area: sriov
+      category: functional
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== PROVISIONING =====
+  - criteria:
+      area: provisioning
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== DRM =====
+  - criteria:
+      area: drm
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== PERF_TOOL =====
+  - criteria:
+      area: perf_tool
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== SERIAL CONSOLE =====
+  - criteria:
+      area: serial_console
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== CPU =====
+  # Note: Requires big VM sizes
+  - criteria:
+      area: cpu
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== KDUMP =====
+  # Lower Priority tests spawn huge VMs and kdump
+  # is not critical for BOSH images
+  - criteria:
+      area: kdump
+      priority: [1]
+    enabled: $(include_gen1_tests)
+
+  # ===== VM RESIZE =====
+  - criteria:
+      area: vm_resize
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== MSR =====
+  - criteria:
+      area: msr
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== DRM =====
+  - criteria:
+      area: drm
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== MDATP =====
+  - criteria:
+      area: mdatp
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===== STRESS-NG =====
+  - criteria:
+      area: stress-ng
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+  
+  # ===== XDP =====
+  # Note: Requires extra space on root disk
+  - criteria:
+      area: xdp
+      priority: $(test_priorities)
+    enabled: $(include_gen1_tests)
+
+  # ===============================
+  # Gen2-Image specific tests
+  # ===============================
+
+  # ===== TVM =====
+  # Note: Secure Boot is important for BOSH images.
+  # However, only available with generation 2 images.
+  # Generation 2 Images are not supported for Jammy.
+  # Generation 2 Images will be supported with Noble.
+  - criteria:
+      area: tvm # Secure Boot
+    enabled: $(include_gen2_tests)
+  # ===== NVMe =====
+  # Note: NVMe is only available with generation 2 images.
+  # Generation 2 Images are not supported for Jammy.
+  # Generation 2 Images will be supported with Noble.
+  - criteria:
+      area: nvme
+    enabled: $(include_gen2_tests)
+  # ===== POWER =====
+  # Hibernation supported VM images will be built
+  # with generation 2 images.
+  - criteria:
+      area: power
+    enabled: $(include_gen2_tests)
+
+  # ===============================
+  # 🚧 Temporarily Disabled Areas
+  # ===============================
+
+  # ===== DPDK =====
+  # Disbled, because most tests are failing with
+  # installation errors or assertion errors.
+  # Example:
+  # - verify_dpdk_multiprocess: failed. AssertionError: [ninja install failed for dpdk binaries. Get unexpected exit code on cmd ['sudo', 'sh', '-c', 'export PYTHONPATH="/usr/lib/python310.zip:/usr/lib/python3.10:/usr/lib/python3.10/lib-dynload:/home/vcap/.local/lib/python3.10/site-packages:/usr/local/lib/python3.10/dist-packages:/usr/lib/python3/dist-packages:$PYTHONPATH"; ninja install']] Expected <[0]> to contain item <1>, but did not.
+  # - verify_dpdk_testpmd_hotplug_sender_netvsc_pmd: failed. LisaException: Found no vf hotplug events in testpmd output. Check output to verify if PPS drop occurred and port removal event message matches the expected forms.
+  # - verify_dpdk_vpp: failed. AssertionError: [VPP returned error code while gathering interface info Get unexpected exit code on cmd ['sudo', 'vppctl', 'show', 'int']] Expected <[0]> to contain item <1>, but did not.
+  - criteria:
+      area: dpdk
+    select_action: exclude
+
+  # ===== LTP =====
+  - criteria:
+      area: ltp
+    select_action: exclude
+
+  # ===== STORAGE =====
+  # Disabled, because most tests are failing, because the expected
+  # boot partition layout is not met in BOSH deployed VMs.
+  - criteria:
+      area: storage
+    select_action: exclude
+
+  # ===== KVM =====
+  # https://gitlab.com/kvm-unit-tests/kvm-unit-tests
+  # Disabled, because some KVM tests are failing:
+  # ['xapic', 'pku', 'eventinj', 'setjmp', 'rmap_chain', 'svm', 'pcid-disabled',
+  #  'umip', 'vmx_eoi_bitmap_ioapic_scan', 'vmx_hlt_with_rvi_test', 'tsx-ctrl']
+  - criteria:
+      area: kvm
+    select_action: exclude
+
+  # ===============================
+  # 🛑 Excluded Areas
+  # ===============================
+  - criteria:
+      area: gpu # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: hpc # aka "Infiniband" - Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: cvm # aka "Confidential Compute" - Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: ACC_CVM # aka "Confidential Compute" - Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: ACC_BVT # aka "Confidential Compute" - Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: vm_extension # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: cloud-hypervisor # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: rust-vmm # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: bpf # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: cdrom # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: lis # Not supported on Ubuntu images
+    select_action: exclude
+  - criteria:
+      area: firewalld # Not supported on Ubuntu images
+    select_action: exclude
+  - criteria:
+      area: dmcache # Not supported on Ubuntu images
+    select_action: exclude
+  - criteria:
+      area: virtual_client # Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: mshv # aka "Microsoft Hypervisor" - Not relevant for BOSH images
+    select_action: exclude
+  - criteria:
+      area: nested # aka "Nested Virtualization" - Not relevant for BOSH images
+    select_action: exclude
