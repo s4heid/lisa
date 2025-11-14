@@ -111,6 +111,15 @@ class Disk(Feature):
                     dev = get_matched_str(output, _get_device_from_gpt_bsd_regex)
                     boot_partition.disk = dev
                 break
+
+        # If no separate boot partition is found (common in VM Generation 1 with BIOS boot),
+        # fall back to using the root partition for disk controller type detection
+        if boot_partition is None:
+            for partition in partition_info:
+                if partition.mount_point == "/":
+                    boot_partition = partition
+                    break
+
         return boot_partition
 
     def get_disk_type(self, disk: str) -> schema.StorageInterfaceType:
