@@ -352,8 +352,53 @@ class Ntttcp(Tool):
     def create_ntttcp_result(
         self, result: ExecutableResult, role: str = "server"
     ) -> NtttcpResult:
+        # Check if test was interrupted before parsing results
+        # Note: "receiver exited from current test" is a normal status message, not an error
+        if "Test was interrupted" in result.stdout:
+            self._log.warning(
+                f"NTTTCP {role} test was interrupted before completion. "
+                f"Exit code: {result.exit_code}. "
+                f"Output preview: {result.stdout[:500]}"
+            )
+            raise LisaException(
+                f"NTTTCP {role} test was interrupted and did not produce complete results. "
+                "This typically indicates the test process was terminated prematurely. "
+                "Check system logs for resource issues or crashes."
+            )
+        # Validate that we have the complete results section
+        if "Totals:" not in result.stdout or "cycles/byte" not in result.stdout:
+            self._log.warning(
+                f"NTTTCP {role} output missing complete results section. "
+                f"Exit code: {result.exit_code}. "
+                f"Output length: {len(result.stdout)} bytes. "
+                f"Last 500 chars: {result.stdout[-500:]}"
+            )
+            raise LisaException(
+                f"NTTTCP {role} test completed but did not produce the expected results section. "
+                "The output may be incomplete due to early process termination or output buffering issues."
+            )
+
+        # Parse results using the class pattern
         matched_results = self.output_pattern.match(result.stdout)
-        assert matched_results, "not found matched ntttcp results."
+        # assert matched_results, "not found matched ntttcp results."
+        if not matched_results:
+            missing_fields = []
+            if "throughput" not in result.stdout:
+                missing_fields.append("throughput")
+            if "tx_packets" not in result.stdout:
+                missing_fields.append("tx_packets")
+            if "rx_packets" not in result.stdout:
+                missing_fields.append("rx_packets")
+            if "cycles/byte" not in result.stdout:
+                missing_fields.append("cycles/byte")
+            raise LisaException(
+                f"NTTTCP {role} results parsing failed. "
+                f"Could not match expected pattern in output. "
+                f"Missing fields: {', '.join(missing_fields) if missing_fields else 'pattern mismatch'}. "
+                f"Exit code: {result.exit_code}. "
+                f"Output length: {len(result.stdout)} bytes."
+            )
+
         ntttcp_result = NtttcpResult()
         ntttcp_result.role = role
         if "Mbps" == matched_results.group("unit"):
