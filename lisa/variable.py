@@ -41,6 +41,49 @@ class VariableEntry:
             self.is_case_visible = self.is_case_visible or new_variable.is_case_visible
 
 
+def _try_parse_string_value(value: str) -> Any:
+    """
+    Try to parse a string value into a richer type. Supports:
+    - Array syntax: "[1,2,3]" -> [1, 2, 3]
+    """
+    stripped = value.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        try:
+            parsed = yaml.safe_load(stripped)
+            if isinstance(parsed, list):
+                return parsed
+        except yaml.YAMLError:
+            pass
+    return value
+
+
+def _convert_string_to_list(original_list: list, string_value: str) -> list:
+    """
+    Convert a comma-separated string to a list, attempting to match the
+    element types of the original list.
+    """
+    parts = [p.strip() for p in string_value.split(",")]
+
+    # Determine the target element type from the original list
+    element_type = None
+    if original_list:
+        for item in original_list:
+            if item is not None:
+                element_type = type(item)
+                break
+
+    if element_type and element_type is not str:
+        converted = []
+        for part in parts:
+            try:
+                converted.append(element_type(part))
+            except (ValueError, TypeError):
+                converted.append(part)
+        return converted
+
+    return parts
+
+
 def _try_convert_type(original_value: Any, new_value: Any) -> Any:
     """
     Take the non-string type. The string is default type, and it can be
@@ -53,6 +96,9 @@ def _try_convert_type(original_value: Any, new_value: Any) -> Any:
     new_type = type(new_value)
     if original_type == new_type:
         return new_value
+
+    if original_type is list and new_type is str:
+        return _convert_string_to_list(original_value, new_value)
 
     target_type = new_type if new_type is not str else original_type
     try:
@@ -404,6 +450,8 @@ def _add_variable(
     mask_pattern_name: str = "",
 ) -> None:
     key = key.lower()
+    if isinstance(value, str):
+        value = _try_parse_string_value(value)
     variable = current_variables.get(key, None)
     if variable:
         variable.data = value

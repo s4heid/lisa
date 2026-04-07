@@ -253,6 +253,53 @@ class VariableTestCase(TestCase):
         self.assertIsInstance(cm.exception, LisaException)
         self.assertIn("variable support only yaml and yml", str(cm.exception))
 
+    def test_cli_array_bracket_syntax(self) -> None:
+        pairs = ["tier:[1,2,3]"]
+        result = variable.add_secrets_from_pairs(pairs)
+        self.assertEqual([1, 2, 3], result["tier"].data)
+
+    def test_cli_array_bracket_syntax_strings(self) -> None:
+        pairs = ["names:[a, b, c]"]
+        result = variable.add_secrets_from_pairs(pairs)
+        self.assertEqual(["a", "b", "c"], result["names"].data)
+
+    def test_cli_array_override_existing_list(self) -> None:
+        variables: Dict[str, variable.VariableEntry] = {
+            "tier": variable.VariableEntry("tier", [1, 2]),
+        }
+        new_vars = variable.add_secrets_from_pairs(["tier:1,2,3"])
+        variable.merge_variables(variables, new_vars)
+        self.assertEqual([1, 2, 3], variables["tier"].data)
+
+    def test_cli_array_override_existing_list_with_brackets(self) -> None:
+        variables: Dict[str, variable.VariableEntry] = {
+            "tier": variable.VariableEntry("tier", [1, 2]),
+        }
+        new_vars = variable.add_secrets_from_pairs(["tier:[1,2,3]"])
+        variable.merge_variables(variables, new_vars)
+        self.assertEqual([1, 2, 3], variables["tier"].data)
+
+    def test_env_array_bracket_syntax(self) -> None:
+        os.environ["LISA_tier"] = "[1,2,3]"
+        self.addCleanup(os.environ.pop, "LISA_tier", None)
+        result = variable._load_from_env()
+        self.assertEqual([1, 2, 3], result["tier"].data)
+
+    def test_env_array_override_existing_list(self) -> None:
+        os.environ["LISA_tier"] = "1,2,3"
+        self.addCleanup(os.environ.pop, "LISA_tier", None)
+        variables: Dict[str, variable.VariableEntry] = {
+            "tier": variable.VariableEntry("tier", [1, 2]),
+        }
+        env_vars = variable._load_from_env()
+        variable.merge_variables(variables, env_vars)
+        self.assertEqual([1, 2, 3], variables["tier"].data)
+
+    def test_string_with_comma_stays_string_without_original_list(self) -> None:
+        pairs = ["msg:hello, world"]
+        result = variable.add_secrets_from_pairs(pairs)
+        self.assertEqual("hello, world", result["msg"].data)
+
     def _test_runbook_file_entry(
         self,
         data: Any,

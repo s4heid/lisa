@@ -52,7 +52,9 @@ def support_variable(parser: ArgumentParser) -> None:
         help="Variables are defined in runbooks, LISA doesn't pre-define any variable, "
         "Specify one or more variables in the format of `name:value`, which will "
         "overwrite the value in the YAML file. It can support secret values in the "
-        "format of `s:name:value`. Learn more from documents.",
+        "format of `s:name:value`. Arrays can be specified as `name:[1,2,3]` or "
+        "as comma-separated values `name:1,2,3` when overriding an existing array "
+        "variable. Learn more from documents.",
     )
 
 
